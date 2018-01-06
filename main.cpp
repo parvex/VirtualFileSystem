@@ -1,34 +1,38 @@
 #include <iostream>
-#include <string.h>
+
 using namespace std;
 #include "vfs.h"
-#include <stdlib.h>
+
 int main(int argc, char ** argv)
 {
 	char * vfs_name;
 	char * command;
 	Vfs disc;
-	disc.vfsCreate("dysk", 100000);
-	disc.vfsClose();
-	disc.vfsOpen("dysk");
-	disc.copyToVfs("test.txt", "test.txt");
-	disc.vfsClose();
+	////disc.vfsCreate("dysk", 100000);
+	////disc.vfsClose();
+	//disc.vfsOpen("dysk");
+	//disc.deleteFromVfs("test.txt");
+	//disc.listFiles();
+	//disc.listInfoBlocks();
+	//getchar();
+	////disc.copyToVfs("plan.png", "plan.png");
+	////disc.copyFromVfs("plan.png", "copiedplan.png");
+	//disc.vfsClose();
 
 
-	return 0;
+
+
 	if (argc < 3)
 	{
 		cout << argv[0] << " <vfs name> command (...)\n";
-		cout << "@@@@@@@@@@@@@@@@@@";
 		cout << "Availible commands: \n";
 		cout << "- create <size in bytes>\n";
-		cout << "- dump\n";
+		cout << "- map\n";
 		cout << "- list\n";
 		cout << "- push <source file name> <destination file name>\n";
 		cout << "- pull <source file name> <destination file name>\n";
 		cout << "- remove <file name>\n";
 		cout << "- delete\n";
-		cout << "@@@@@@@@@@@@@@@@@@";
 		return 1;
 	}
 
@@ -42,67 +46,58 @@ int main(int argc, char ** argv)
 			size_t size = atoi(argv[3]);
 			if(disc.vfsCreate(vfs_name, size))
 			{
-				printf("Nie udalo sie utworzyc dysku wirtualnego!\n");
+				cout << "Nie udalo sie otworzyc dysku wirtualnego!\n";
 				return 2;
 			}
 			disc.vfsClose();
 		}
 		else
-			printf("%s <vfs name> create <size in bytes>\n", argv[0]);
+			cout << argv[0]<< " <vfs name> create <size in bytes>" << endl;
 	}
-	else if (strcmp("dump", command) == 0)
+	else if (strcmp("map", command) == 0)
 	{
 		if (argc == 3)
 		{
-			
 			if (disc.vfsOpen(argv[1]))
 			{
-				printf("Nie udalo sie otworzyc dysku wirtualnego!\n");
-				return 2;
+				cout << "Nie udalo sie otworzyc dysku wirtualnego!\n";
+					return 2;
 			}
-
 			disc.listInfoBlocks();
-
 			disc.vfsClose();
 		}
 		else
-			printf("%s <vfs name> dump\n", argv[0]);
+			cout << argv[0] << " <vfs name> dump\n";
 	}
 	else if (strcmp("list", command) == 0)
 	{
 		if (argc == 3)
 		{
-			
 			if (disc.vfsOpen(argv[1]))
 			{
-				printf("Nie udalo sie otworzyc dysku wirtualnego!\n");
+				cout << "Nie udalo sie otworzyc dysku wirtualnego!\n";
 				return 2;
 			}
-
 			disc.listFiles();
-
 			disc.vfsClose();
 		}
 		else
-			printf("%s <vfs name> list\n", argv[0]);
+			cout << argv[0] << " <vfs name> list\n";
 	}
 	else if (strcmp("push", command) == 0)
 	{
 		if (argc == 5)
 		{
-			
 			if (disc.vfsOpen(argv[1]))
 			{
-				printf("Nie udalo sie otworzyc dysku wirtualnego!\n");
-				return 2;
+				cout << "Nie udalo sie otworzyc dysku wirtualnego!\n";
+					return 2;
 			}
-
-			printf("Wysylanie pliku, wynik: %d\n", disc.copyToVfs(argv[3], argv[4]));
-
+			cout << "Wysylanie pliku, wynik: " << disc.copyToVfs(argv[3], argv[4]) << endl;
 			disc.vfsClose();
 		}
 		else
-			printf("%s <vfs name> push <source file name> <destination file name>\n", argv[0]);
+			cout << argv[0] << "<vfs name> push <source file name> <destination file name>\n";
 	}
 	else if (strcmp("pull", command) == 0)
 	{
@@ -110,16 +105,14 @@ int main(int argc, char ** argv)
 		{
 			if (disc.vfsOpen(argv[1]))
 			{
-				printf("Nie udalo sie otworzyc dysku wirtualnego!\n");
+				cout << "Nie udalo sie otworzyc dysku wirtualnego!\n";
 				return 2;
 			}
-
-			printf("Pobieranie pliku, wynik: %d\n", disc.copyFromVfs(argv[3], argv[4]));
-
+			cout << "Pobieranie pliku, wynik: " << disc.copyFromVfs(argv[3], argv[4]) << endl;
 			disc.vfsClose();
 		}
 		else
-			printf("%s <vfs name> pull <source file name> <destination file name>\n", argv[0]);
+			cout << argv[0] << "<vfs name> pull <source file name> <destination file name>\n";
 	}
 	else if (strcmp("remove", command) == 0)
 	{
@@ -127,31 +120,30 @@ int main(int argc, char ** argv)
 		{
 			if (disc.vfsOpen(argv[1]))
 			{
-				printf("Nie udalo sie otworzyc dysku wirtualnego!\n");
+				cout << "Nie udalo sie otworzyc dysku wirtualnego!\n";
 				return 2;
 			}
 
-		disc.deleteFromVfs(argv[3]);
+			disc.deleteFromVfs(argv[3]);
 
 			disc.vfsClose();
 		}
 		else
-			printf("%s <vfs name> pull <source file name> <destination file name>\n", argv[0]);
+			cout << argv[0] << " <vfs name> pull <source file name> <destination file name>\n";
 	}
 	else if (strcmp("delete", command) == 0)
 	{
 		if (argc == 3)
 			if (disc.deleteVfs(argv[1]))
 				return -12;
-		else
-			printf("%s <vfs name> delete\n", argv[0]);
+			else
+				cout << argv[0] << " <vfs name> delete\n";
 	}
 	else
 	{
-		printf("%s invalid command `%s`\n", argv[0], command);
+		cout << argv[0] << " invalid command: " << command << endl;
 		return 1;
 	}
-
 
 	return 0;
 }

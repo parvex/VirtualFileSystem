@@ -1,23 +1,27 @@
 #pragma once
 #include <fstream>
 #include <iostream>
+#include <iomanip> 
 #include <vector>
+#include <string.h>
+#include <stdlib.h>
 using namespace std;
 
 #define BLOCK 2048
-#define MAXNAME 116
+#define MAXNAME 112
 #define MAXDISCNAME 60
 #define UNUSED 0
 #define BEGIN 1
 #define USED 2
 #define ENDFILE 3
-struct infoBlock{
+struct InfoBlock{
 	unsigned size{};
-	char name[MAXNAME];
-	unsigned next{};
+	unsigned fileSize{};
+	char name[MAXNAME]{};
+	int next{};
 	int flag{};
 };
-struct discBlock {
+struct DiscBlock {
 	size_t blocks{};
 	size_t size{};
 	char discName[MAXDISCNAME];
@@ -26,8 +30,8 @@ class Vfs {
 
 private:
 	fstream file;
-	discBlock dBlock;
-	infoBlock* iTab{};
+	DiscBlock dBlock;
+	InfoBlock* iTab{};
 	bool opened{};
 public:
 
@@ -36,12 +40,12 @@ public:
 		file.open(vfsName, std::fstream::out | std::fstream::in |  std::fstream::binary | std::fstream::trunc);
 		if (!file.is_open()) return -10;
 		char zerobuf[BLOCK]{};
-		strcpy_s(dBlock.discName, vfsName);
+		strcpy(dBlock.discName, vfsName);
 		dBlock.blocks = sizeToBlocks(size);
 		dBlock.size = sizeToBlocks(size) * BLOCK;
-		file.write((char*)&dBlock, sizeof(discBlock));
+		file.write((char*)&dBlock, sizeof(DiscBlock));
 		for (unsigned i = 0; i < dBlock.blocks; ++i)
-			file.write(zerobuf, sizeof(infoBlock));
+			file.write(zerobuf, sizeof(InfoBlock));
 		for (unsigned i = 0; i < dBlock.blocks; ++i)
 			file.write(zerobuf, BLOCK);
 
@@ -52,8 +56,8 @@ public:
 	{
 		if (opened)
 		{
-			file.seekp(sizeof(discBlock), ios::beg);
-			file.write((char*)iTab, sizeof(infoBlock)*dBlock.blocks);
+			file.seekp(sizeof(DiscBlock), ios::beg);
+			file.write((char*)iTab, sizeof(InfoBlock)*dBlock.blocks);
 			delete iTab;
 		}
 		file.close();
@@ -66,8 +70,8 @@ public:
 		file.open(fileName, std::fstream::in | std::fstream::out | std::fstream::binary);
 		if (!file.is_open()) return -1;
 		file.read((char*)&dBlock, sizeof(dBlock));
-		iTab = new infoBlock[dBlock.blocks];
-		file.read((char*)iTab, sizeof(infoBlock)*dBlock.blocks);
+		iTab = new InfoBlock[dBlock.blocks];
+		file.read((char*)iTab, sizeof(InfoBlock)*dBlock.blocks);
 		if (file.fail()) return -1;
 		opened = true;
 		return 0;
@@ -78,32 +82,36 @@ public:
 		fstream source(sourceName, std::fstream::in | std::fstream::binary | std::fstream::ate);
 		if (!source.is_open()) return -1;
 		char buffer[2048];
-		size_t sourceSize = source.tellg();
+		size_t sourceSize = (size_t)source.tellg();
 		source.seekg(0, ios::beg);
 		unsigned blocksNeeded = sizeToBlocks(sourceSize);
 
 		vector<unsigned> blockList;
 		for (unsigned i = 0; i < dBlock.blocks && blockList.size() < blocksNeeded; ++i)
 		{
-			if (i == dBlock.blocks - 1)
-				return -10; //not enough space
 			if (iTab[i].flag == UNUSED)
 				blockList.push_back(i);
-			if (i >= dBlock.blocks - 1) return -2;
-		}
 
+		}
+		if(blocksNeeded > blockList.size()) return -14;
 		for (unsigned i = 0; i < dBlock.blocks && i < blocksNeeded; ++i)
 		{
+			strcpy(iTab[blockList[i]].name, destinationName);
 			if (i == 0)
 			{
 				iTab[blockList[i]].flag = BEGIN;
-				strcpy_s(iTab[blockList[i]].name, destinationName);
+				iTab[blockList[i]].fileSize = sourceSize;
+
 				if (sourceSize >= BLOCK)
 				{
 					iTab[blockList[i]].size = BLOCK;
 					iTab[blockList[i]].next = blockList[i + 1];
 				}
-				else  iTab[blockList[i]].size = sourceSize;
+				else
+				{
+					iTab[blockList[i]].size = sourceSize;
+					iTab[blockList[i]].next = -1;
+				}
 			}
 			else if (i != blocksNeeded-1)
 			{
@@ -115,6 +123,7 @@ public:
 			{
 				iTab[blockList[i]].flag = ENDFILE;
 				iTab[blockList[i]].size = sourceSize - (blocksNeeded - 1) * BLOCK;
+				iTab[blockList[i]].next = -1;
 			}
 			source.read(buffer, iTab[blockList[i]].size);
 			file.seekp(blockAdress(blockList[i]), ios::beg); 
@@ -127,22 +136,67 @@ public:
 
 	int copyFromVfs(char* sourceName, char* destinationName)
 	{
-		return 1;
+		fstream destFile(destinationName, std::fstream::out | std::fstream::binary | std::fstream::trunc);
+		int currentBlock = -1;
+		size_t currentSize;
+		size_t fileSize;
+		char buffer[BLOCK];
+		for (size_t i = 0; i < dBlock.blocks; ++i)
+			if (iTab[i].flag == BEGIN && strcmp(iTab[i].name, sourceName) == 0)
+			{
+				currentBlock = i;
+				currentSize = iTab[i].size;
+				fileSize = iTab[i].fileSize;
+			}
+		if(currentBlock == -1) return -1;
+
+		while (currentBlock != -1)
+		{
+			file.seekp(blockAdress(currentBlock));
+			file.read(buffer, iTab[currentBlock].size);
+			destFile.write(buffer, iTab[currentBlock].size);
+
+
+
+			currentBlock = iTab[currentBlock].next;
+		}
+		destFile.close();
+
+		return 0;
 	}
 
 	int listFiles()
 	{
-		return 1;
+		cout << "File list:\n\n";
+		for (size_t i = 0; i < dBlock.blocks; ++i)
+			if (iTab[i].flag == BEGIN)
+			{
+				cout << iTab[i].name << "  " << iTab[i].fileSize << " bytes\n";
+			}
+		return 0;
 	}
 
 	int deleteFromVfs(char* fileName)
 	{
-		return 1;
+		int currentBlock = -1;
+		size_t i = 0;
+		for (; i < dBlock.blocks; ++i)
+			if (iTab[i].flag == BEGIN && strcmp(iTab[i].name, fileName) == 0)
+				currentBlock = i;
+		int temp;
+		while (currentBlock >= 0)
+		{
+			iTab[currentBlock].flag = UNUSED;
+			temp = iTab[currentBlock].next;
+			iTab[currentBlock].next = -1;
+			currentBlock = temp;
+		}
+		return 0;
 	}
 
 	int deleteVfs(char* name)
 	{
-		file.open(name, std::fstream::in || std::fstream::out);
+		file.open(name, std::fstream::in | std::fstream::out);
 		file.read((char*)&dBlock, sizeof(dBlock));
 		file.close();
 		if (remove(dBlock.discName)) return -1;
@@ -152,7 +206,34 @@ public:
 
 	int listInfoBlocks()
 	{
-		return 1;
+		cout << "Disc map:\n\n";
+		cout << "###############\n";
+		size_t taken = 0;
+		for (size_t i = 0; i < dBlock.blocks; ++i)
+		{
+			if(iTab[i].flag == USED || iTab[i].flag == BEGIN)
+				taken += BLOCK;
+			cout << "filename: " << iTab[i].name << endl;
+			cout << "block: " << i << endl;
+			cout << "adress: " << blockAdress(i) << endl;
+			cout << "flag: " << iTab[i].flag << endl;
+			cout << "next: " << iTab[i].next << endl;
+			int flag{};
+			if (iTab[i].flag == BEGIN)
+			{
+				cout << "filesize: " << iTab[i].fileSize << " bytes\n";
+				cout << "size:" << iTab[i].size << endl;
+			}
+			if(iTab[i].flag == ENDFILE)
+				cout << "size:" << iTab[i].size << endl;
+			cout << "--------------\n";
+			
+		}
+		cout << "###############\n";
+		cout << "Disc size: " << dBlock.size << endl;
+		cout << "Memory taken: " << taken << endl;
+		cout << std::fixed << std::setprecision(2) << (double)taken / dBlock.size *100 << "% space is taken\n";
+		return 0;
 	}
 
 
@@ -166,6 +247,6 @@ public:
 
 	size_t blockAdress(size_t nr)
 	{
-		return sizeof(discBlock) + sizeof(infoBlock)*dBlock.blocks+ BLOCK * nr;
+		return sizeof(DiscBlock) + sizeof(InfoBlock)*dBlock.blocks+ BLOCK * nr;
 	}
 };
